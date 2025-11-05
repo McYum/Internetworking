@@ -25,20 +25,20 @@ public class CPCommandMsg extends CPMsg {
         this.cookie = cookie;
         this.id = nextId++;
         
-        // a. CRC32-Prüfsumme berechnen
+        // a. CRC32-Checksum
         CRC32 crc32 = new CRC32();
         crc32.update(command.getBytes());
         this.crc = crc32.getValue();
         
-        // Nachricht formatieren
+        // Format msg
         String formattedData = String.format("%d %d %d %s", this.cookie, this.id, this.crc, this.command);
-        
-        // Die create-Methode der Superklasse aufrufen, um "cp " voranzustellen
+
+        // Call the superclass create method to prepend "cp"
         super.create(formattedData);
     }
     
     @Override
     protected Msg parse(String sentence) throws IWProtocolException {
-        throw new UnsupportedOperationException("Parsing von CommandMsg ist auf dem Client nicht implementiert.");
+        throw new UnsupportedOperationException("Parsing of CommandMsg is not implemented on the client.");
     }
 }

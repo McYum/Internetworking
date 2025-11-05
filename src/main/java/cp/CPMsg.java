@@ -29,11 +29,11 @@ class CPMsg extends Msg {
         } else if (content.startsWith(CPCookieResponseMsg.CP_CRES_HEADER)) {
             parsedMsg = new CPCookieResponseMsg();
         } else {
-            // Annahme: Wenn es keine der bekannten Antworten ist, muss es eine Befehlsantwort sein.
-            // Das Format ist <id> ACK/NAK. Wir prüfen, ob der erste Teil eine Zahl ist.
+            // Assumption: If it's not one of the known answers, it must be a command response
+            // The format is <id> ACK/NAK. We check if the first part is a number.
             try {
                 Integer.parseInt(content.split("\\s+")[0]);
-                parsedMsg = new CPCommandResponseMsg(); // Es ist eine Befehlsantwort
+                parsedMsg = new CPCommandResponseMsg(); // It's a command response
             } catch (NumberFormatException e) {
                 throw new IllegalMsgException();
             }
