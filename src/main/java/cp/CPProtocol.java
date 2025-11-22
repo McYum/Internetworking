@@ -55,6 +55,11 @@ public class CPProtocol extends Protocol {
         this.PhyConfigCookieServer = new PhyConfiguration(rname, rp, proto_id.CP);
     }
 
+    // Expose cookie value for testing and observability
+    public int getCookie() {
+        return this.cookie;
+    }
+
     @Override
     public void send(String s, Configuration config) throws IOException, IWProtocolException {
         if (this.role != cp_role.CLIENT) {
@@ -165,23 +170,57 @@ public class CPProtocol extends Protocol {
         return null;
     }
 
-    // FIXED: Processing of the CookieRequestMsg
+    // Processing of the CookieRequestMsg
     private void cookie_process(CPMsg cpmIn) throws IWProtocolException, IOException {
         System.out.println("Received cookie request from: " + cpmIn.getConfiguration());
 
-        // 1. Generate a new, unique cookie.
-        int newCookieValue = rnd.nextInt(Integer.MAX_VALUE);
+        PhyConfiguration clientConf = (PhyConfiguration) cpmIn.getConfiguration();
+        
+        // Check if the client already has a cookie
+        if (cookieMap.containsKey(clientConf)) {
+            Cookie existing = cookieMap.get(clientConf);
+            int existingCookieValue = existing.getCookieValue();
+            System.out.println("Client already has cookie " + existingCookieValue + ", returning existing cookie.");
+
+            CPCookieResponseMsg response = new CPCookieResponseMsg(true);
+            response.create(String.valueOf(existingCookieValue));
+            PhyProto.send(new String(response.getDataBytes()), cpmIn.getConfiguration());
+            return;
+        }
+
+        // Enforce maximum number of stored cookies
+        if (cookieMap.size() >= CP_HASHMAP_SIZE) {
+            System.out.println("Cookie map full (" + cookieMap.size() + ") - rejecting new cookie request from " + clientConf);
+            // Send a NAK - CPCookieResponseMsg will format "cookie_response NAK <reason>"
+            CPCookieResponseMsg response = new CPCookieResponseMsg(false);
+            response.create("no resources");
+            PhyProto.send(new String(response.getDataBytes()), cpmIn.getConfiguration());
+            return;
+        }
+
+        // Issue a new cookie make sure its unique
+        int newCookieValue;
+        boolean isUnique;
+        
+        do {
+            newCookieValue = rnd.nextInt(Integer.MAX_VALUE);
+            isUnique = true;
+            for (Cookie c : cookieMap.values()) {
+                if (c.getCookieValue() == newCookieValue) {
+                    isUnique = false;
+                    break;
+                }
+            }
+        } while (!isUnique);
+        
         Cookie newCookie = new Cookie(System.currentTimeMillis(), newCookieValue);
 
-        // 2. Store the cookie with the client's configuration as the key.
-        cookieMap.put((PhyConfiguration) cpmIn.getConfiguration(), newCookie);
-        System.out.println("Generated new cookie " + newCookieValue);
+        cookieMap.put(clientConf, newCookie);
+        System.out.println("Generated new cookie " + newCookieValue + " for " + clientConf);
 
-        // 3. Create a success response message.
-        CPCookieResponseMsg response = new CPCookieResponseMsg();
-        response.create(newCookieValue, true);
+        CPCookieResponseMsg response = new CPCookieResponseMsg(true);
+        response.create(String.valueOf(newCookieValue));
 
-        // 4. Send the response back to the client.
         PhyProto.send(new String(response.getDataBytes()), cpmIn.getConfiguration());
         System.out.println("Sent cookie response to client.");
     }

@@ -29,12 +29,27 @@ class CPMsg extends Msg {
         } else if (content.startsWith(CPCookieResponseMsg.CP_CRES_HEADER)) {
             parsedMsg = new CPCookieResponseMsg();
         } else {
-            // Assumption: If it's not one of the known answers, it must be a command response
-            // The format is <id> ACK/NAK. We check if the first part is a number.
-            try {
-                Integer.parseInt(content.split("\\s+")[0]);
-                parsedMsg = new CPCommandResponseMsg(); // It's a command response
-            } catch (NumberFormatException e) {
+            // Better discrimination between command messages and command responses:
+            // - Command response format: "<id> ACK|NAK" (2 tokens, second ACK/NAK)
+            // - Command request format: "<cookie> <id> <crc> <command>" (>=4 tokens)
+            String[] cparts = content.split("\\s+");
+            if (cparts.length >= 2 && ("ACK".equals(cparts[1]) || "NAK".equals(cparts[1]))) {
+                // Likely a command response (e.g., "42 ACK")
+                try {
+                    Integer.parseInt(cparts[0]);
+                    parsedMsg = new CPCommandResponseMsg();
+                } catch (NumberFormatException e) {
+                    throw new IllegalMsgException();
+                }
+            } else if (cparts.length >= 4) {
+                // Likely a command message (e.g., "<cookie> <id> <crc> <command>")
+                try {
+                    Integer.parseInt(cparts[0]); // cookie
+                    parsedMsg = new CPCommandMsg();
+                } catch (NumberFormatException e) {
+                    throw new IllegalMsgException();
+                }
+            } else {
                 throw new IllegalMsgException();
             }
         }

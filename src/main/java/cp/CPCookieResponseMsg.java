@@ -5,7 +5,7 @@ import exceptions.IWProtocolException;
 import exceptions.IllegalMsgException;
 
 public class CPCookieResponseMsg extends CPMsg {
-    protected static final String CP_CRES_HEADER = "cres";
+    protected static final String CP_CRES_HEADER = "cookie_response";
     private int cookie;
     private boolean success;
 
@@ -17,42 +17,60 @@ public class CPCookieResponseMsg extends CPMsg {
         return success;
     }
 
-    /**
-     * Creates a cookie response message.
-     * @param cookie The cookie value to send.
-     * @param success True if the request was successful, false otherwise.
-     */
-    public void create(int cookie, boolean success) {
+    // Additional constructor to satisfy tests: success decided at construction
+    public CPCookieResponseMsg() { }
+
+    public CPCookieResponseMsg(boolean success) {
         this.success = success;
-        this.cookie = cookie;
-        String content = success ? CP_CRES_HEADER + " " + cookie : CP_CRES_HEADER + " NAK";
+    }
+
+    // Test API: build message body depending on success flag
+    @Override
+    public void create(String payload) {
+        String content;
+        if (this.success) {
+            // Expected by tests: "cp cookie_response ACK <cookie>"
+            content = CP_CRES_HEADER + " ACK " + payload;
+            try {
+                this.cookie = Integer.parseInt(payload);
+            } catch (NumberFormatException e) {
+                // leave cookie default; parse() will validate during receive-side usage
+            }
+        } else {
+            // Expected by tests: "cp cookie_response NAK <reason>"
+            content = CP_CRES_HEADER + " NAK " + payload;
+        }
         super.create(content);
     }
 
     @Override
-    protected void create(String data) {
-        // This method is not meant to be used directly for this message type.
-        throw new UnsupportedOperationException("Use create(int cookie, boolean success) instead.");
-    }
-
-    @Override
     protected Msg parse(String sentence) throws IWProtocolException {
-        // Expected format: "cres <cookie>" or "cres NAK"
+        // Expected format: "cookie_response ACK <cookie>" or "cookie_response NAK <reason>"
         String[] parts = sentence.split("\\s+");
-        if (parts.length != 2 || !parts[0].equals(CP_CRES_HEADER)) {
+        if (parts.length < 2 || !parts[0].equals(CP_CRES_HEADER)) {
             throw new IllegalMsgException();
         }
 
         if (parts[1].equals("NAK")) {
+            // NAK may have an explanation after, which we ignore functionally
             this.success = false;
             this.cookie = -1;
-        } else {
+            if (parts.length < 3) {
+                // allow "cookie_response NAK" without reason as minimal valid? Tests use reason text.
+                // We'll accept presence or absence of reason.
+            }
+        } else if (parts[1].equals("ACK")) {
+            if (parts.length < 3) {
+                throw new IllegalMsgException();
+            }
             try {
-                this.cookie = Integer.parseInt(parts[1]);
+                this.cookie = Integer.parseInt(parts[2]);
                 this.success = true;
             } catch (NumberFormatException e) {
                 throw new IllegalMsgException();
             }
+        } else {
+            throw new IllegalMsgException();
         }
         this.data = sentence;
         return this;

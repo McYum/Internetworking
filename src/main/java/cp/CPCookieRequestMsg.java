@@ -5,7 +5,7 @@ import exceptions.IWProtocolException;
 import exceptions.IllegalMsgException;
 
 public class CPCookieRequestMsg extends CPMsg {
-    protected static final String CP_CREQ_HEADER = "creq";
+    protected static final String CP_CREQ_HEADER = "cookie_request";
 
     @Override
     public void create(String ignored) {
