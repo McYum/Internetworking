@@ -201,14 +201,17 @@ public class CPProtocol extends Protocol {
         // Issue a new cookie make sure its unique
         int newCookieValue;
         boolean isUnique;
-        
+
         do {
             newCookieValue = rnd.nextInt(Integer.MAX_VALUE);
-            isUnique = true;
-            for (Cookie c : cookieMap.values()) {
-                if (c.getCookieValue() == newCookieValue) {
-                    isUnique = false;
-                    break;
+            isUnique = (newCookieValue > 0); // Check 1: has to be > 0
+
+            if (isUnique) { // only check if > 0
+                for (Cookie c : cookieMap.values()) {
+                    if (c.getCookieValue() == newCookieValue) {
+                        isUnique = false;
+                        break;
+                    }
                 }
             }
         } while (!isUnique);
